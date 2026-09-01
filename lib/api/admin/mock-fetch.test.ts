@@ -173,7 +173,13 @@ describe('adminMockFetch', () => {
         emailConfiguration: { apiKey: 'sk-freshkey-abcdef', senderEmail: 'ops@earsfor.you', senderName: 'Ears For You Ops' },
         otpConfiguration: { otpLength: 8, otpExpiryMinutes: 15, maxAttempts: 5, deliveryChannel: 'BOTH' },
         securitySettings: { jwtExpiryMinutes: 45, refreshTokenExpiryDays: 14, maxLoginAttempts: 8, sessionTimeoutMinutes: 20, mfaEnabled: false, ipWhitelistEnabled: true },
-        aiConfiguration: { enableAiChat: false, aiSystemPrompt: 'Custom staging prompt.' },
+        aiConfiguration: { 
+  enableAiChat: false, 
+  aiSystemPromptGenZ: 'Custom staging prompt.',
+  aiSystemPromptMillennial: 'Custom staging prompt.',
+  aiSystemPromptGenX: 'Custom staging prompt.',
+  aiSystemPromptDefault: 'Custom staging prompt.'
+}
       }
       const patchResult = await adminMockFetch<{ message: string }>('/api/v1/admins/settings', { method: 'PATCH', body: patchBody })
       expect(patchResult.message).toBe('System settings updated successfully. Changes are now live.')
@@ -192,7 +198,7 @@ describe('adminMockFetch', () => {
         emailConfiguration: { apiKey: 'sk-realbaselinekey', senderEmail: 'ops@earsfor.you', senderName: 'Ears For You Ops' },
         otpConfiguration: { otpLength: 6, otpExpiryMinutes: 10, maxAttempts: 3, deliveryChannel: 'EMAIL' },
         securitySettings: { jwtExpiryMinutes: 60, refreshTokenExpiryDays: 7, maxLoginAttempts: 5, sessionTimeoutMinutes: 30, mfaEnabled: true, ipWhitelistEnabled: false },
-        aiConfiguration: { enableAiChat: true, aiSystemPrompt: 'Baseline prompt.' },
+        aiConfiguration: { enableAiChat: true, aiSystemPromptGenZ: 'Baseline prompt.', aiSystemPromptMillennial: 'Baseline prompt.', aiSystemPromptGenX: 'Baseline prompt.', aiSystemPromptDefault: 'Baseline prompt.' },
       }
       await adminMockFetch('/api/v1/admins/settings', { method: 'PATCH', body: baseline })
 
@@ -222,7 +228,7 @@ describe('adminMockFetch', () => {
         emailConfiguration: { apiKey: 'sk-customkey', senderEmail: 'custom@example.com', senderName: 'Custom Sender' },
         otpConfiguration: { otpLength: 10, otpExpiryMinutes: 30, maxAttempts: 9, deliveryChannel: 'SMS' },
         securitySettings: { jwtExpiryMinutes: 999, refreshTokenExpiryDays: 888, maxLoginAttempts: 77, sessionTimeoutMinutes: 66, mfaEnabled: false, ipWhitelistEnabled: true },
-        aiConfiguration: { enableAiChat: false, aiSystemPrompt: 'Custom prompt.' },
+        aiConfiguration: { enableAiChat: false, aiSystemPromptGenZ: 'Custom prompt.', aiSystemPromptMillennial: 'Custom prompt.', aiSystemPromptGenX: 'Custom prompt.', aiSystemPromptDefault: 'Custom prompt.' },
       }
       await adminMockFetch('/api/v1/admins/settings', { method: 'PATCH', body: custom })
 
@@ -243,7 +249,10 @@ describe('adminMockFetch', () => {
       expect(after.securitySettings.refreshTokenExpiryDays).toBe(888)
       // Fields not yet reset remain untouched, confirming reset is scoped to exactly the requested key.
       expect(after.apiConfiguration.baseUrl).toBe('https://custom.example.com')
-      expect(after.aiConfiguration.aiSystemPrompt).toBe('Custom prompt.')
+      expect(after.aiConfiguration.aiSystemPromptGenZ).toBe('Custom prompt.')
+      expect(after.aiConfiguration.aiSystemPromptMillennial).toBe('Custom prompt.')
+      expect(after.aiConfiguration.aiSystemPromptGenX).toBe('Custom prompt.')
+      expect(after.aiConfiguration.aiSystemPromptDefault).toBe('Custom prompt.')
 
       // Now reset the sibling too, and confirm it independently reaches its own (different) default.
       await adminMockFetch('/api/v1/admins/settings/jwt_refresh_expiry_days', { method: 'DELETE' })

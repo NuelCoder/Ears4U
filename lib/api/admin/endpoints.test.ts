@@ -370,7 +370,13 @@ describe('admin settings write endpoints', () => {
       emailConfiguration: { apiKey: 'sk-x' + '*'.repeat(16) + '3f2a', senderEmail: 'noreply@example.com', senderName: 'Ears for You' },
       otpConfiguration: { otpLength: 6, otpExpiryMinutes: 10, maxAttempts: 3, deliveryChannel: 'EMAIL' as const },
       securitySettings: { jwtExpiryMinutes: 60, refreshTokenExpiryDays: 7, maxLoginAttempts: 5, sessionTimeoutMinutes: 30, mfaEnabled: false, ipWhitelistEnabled: false },
-      aiConfiguration: { enableAiChat: true, aiSystemPrompt: 'You are a mental health support assistant.' },
+      aiConfiguration: { 
+  enableAiChat: true, 
+  aiSystemPromptGenZ: 'You are a warm Nigerian friend in your mid-20s.',
+  aiSystemPromptMillennial: 'You are a grounded, emotionally intelligent peer.',
+  aiSystemPromptGenX: 'You are a calm, respectful, and dignified companion.',
+  aiSystemPromptDefault: 'You are a warm, empathetic support assistant.'
+}
     }
     await updateAdminSettings(settings)
     expect(client.adminApiFetch).toHaveBeenCalledWith('/api/v1/admins/settings', { method: 'PATCH', body: settings })

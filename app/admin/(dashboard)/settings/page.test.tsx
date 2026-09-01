@@ -76,7 +76,13 @@ const SETTINGS: AdminSystemSettings = {
     jwtExpiryMinutes: 60, refreshTokenExpiryDays: 7, maxLoginAttempts: 5,
     sessionTimeoutMinutes: 30, mfaEnabled: true, ipWhitelistEnabled: false,
   },
-  aiConfiguration: { enableAiChat: true, aiSystemPrompt: 'You are a mental health support assistant for Ears for You.' },
+  aiConfiguration: { 
+  enableAiChat: true, 
+  aiSystemPromptGenZ: 'You are a warm Nigerian friend in your mid-20s.',
+  aiSystemPromptMillennial: 'You are a grounded, emotionally intelligent peer.',
+  aiSystemPromptGenX: 'You are a calm, respectful, and dignified companion.',
+  aiSystemPromptDefault: 'You are a warm, empathetic support assistant.'
+},
 }
 
 // SETTINGS.emailConfiguration without its apiKey field - the payload shape Save should send
