@@ -77,6 +77,7 @@ export default function RegisterPage() {
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [showPassword, setShowPassword] = useState(false) // 🚨 NEW STATE
 
   function set<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft(d => ({ ...d, [key]: value }))
@@ -159,13 +160,28 @@ export default function RegisterPage() {
 
           {step === 3 ? (
             <form onSubmit={submit} className="flex flex-col gap-4">
-              <Field label="Password" type="password" autoComplete="new-password" required
+              
+              {/* 🚨 NEW: Show/Hide Toggle Button */}
+              <div className="flex justify-end -mb-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[13px] font-medium text-fir/70 underline underline-offset-4 hover:text-fir transition-colors"
+                >
+                  {showPassword ? 'Hide passwords' : 'Show passwords'}
+                </button>
+              </div>
+
+              {/* 🚨 UPDATED: type bound to showPassword state */}
+              <Field label="Password" type={showPassword ? "text" : "password"} autoComplete="new-password" required
                 value={draft.password} onChange={e => set('password', e.target.value)}
                 error={draft.password.length > 0 ? pwIssue ?? undefined : undefined} />
-              <Field label="Confirm password" type="password" autoComplete="new-password" required
+              
+              <Field label="Confirm password" type={showPassword ? "text" : "password"} autoComplete="new-password" required
                 value={draft.confirmPassword} onChange={e => set('confirmPassword', e.target.value)}
                 error={error ?? undefined} />
-              <div className="flex gap-3">
+                
+              <div className="flex gap-3 mt-2">
                 <Button type="button" variant="ghost" onClick={() => setStep(2)}>Back</Button>
                 <Button type="submit" busy={busy} disabled={!step3Valid} className="flex-1">
                   Create account

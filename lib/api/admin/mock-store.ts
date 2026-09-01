@@ -110,15 +110,14 @@ const emergencyResources: AdminEmergencyResource[] = [
 ]
 let nextResourceId = 7
 
-// Real backend has no literal default for the email API key (it's env-sourced - a DELETE falls
-// back to reading process.env.EMAIL_APIKEY server-side) or the AI system prompt in the DTO's own
-// getOrDefault fallback chain in the sense of a documented product-facing default, but the AI
-// prompt one IS a real hardcoded string confirmed from AdminSettingController.getSettings()'s
-// getOrDefault fallback - used below as the reset target. The API key has no equivalent literal
-// fallback to mirror in mock mode, so its reset target is this mock's own baseline masked key.
 const DEFAULT_EMAIL_API_KEY = 'sk-x' + '*'.repeat(16) + '3f2a'
-const DEFAULT_AI_SYSTEM_PROMPT =
-  "You are EarsForYou, an empathetic therapist. Validate the user's feelings and keep answers concise, warm, and supportive."
+
+// 🚨 UPDATED: Specific default prompts matching the new backend logic
+const DEFAULT_AI_PROMPT_GENZ = "You are EarsForYou, a warm Nigerian friend in your mid-20s speaking to a Gen Z user. Keep it brief (2-3 sentences)."
+const DEFAULT_AI_PROMPT_MILLENNIAL = "You are EarsForYou, a grounded, emotionally intelligent Nigerian peer in your 30s speaking to a Millennial. Keep it brief (2-3 sentences)."
+const DEFAULT_AI_PROMPT_GENX = "You are EarsForYou, a warm, calm, and deeply respectful confidant speaking to a Gen X adult. Keep it brief (2-3 sentences)."
+const DEFAULT_AI_PROMPT_DEFAULT = "You are EarsForYou, an empathetic therapist. Validate the user's feelings and keep answers concise, warm, and supportive."
+
 
 // Mutable (not const) because updateSettings replaces the whole object wholesale.
 let settings: AdminSystemSettings = {
@@ -126,18 +125,17 @@ let settings: AdminSystemSettings = {
   emailConfiguration: { apiKey: DEFAULT_EMAIL_API_KEY, senderEmail: 'badejoiseoluwa@gmail.com', senderName: 'EarsForYou' },
   otpConfiguration: { otpLength: 6, otpExpiryMinutes: 10, maxAttempts: 3, deliveryChannel: 'EMAIL' },
   securitySettings: { jwtExpiryMinutes: 60, refreshTokenExpiryDays: 7, maxLoginAttempts: 5, sessionTimeoutMinutes: 30, mfaEnabled: true, ipWhitelistEnabled: false },
-  // Deliberately a custom-looking prompt, distinct from DEFAULT_AI_SYSTEM_PROMPT, so the mock
-  // exercises a meaningful before/after when an admin resets ai_system_prompt to default.
-  aiConfiguration: { enableAiChat: true, aiSystemPrompt: 'You are a mental health support assistant for Ears for You.' },
+  
+  // 🚨 UPDATED: Initializing the mock state with custom-looking prompts to ensure resets are visible
+  aiConfiguration: { 
+    enableAiChat: true, 
+    aiSystemPromptGenZ: 'Custom mock: Support assistant for Gen Z.',
+    aiSystemPromptMillennial: 'Custom mock: Support assistant for Millennials.',
+    aiSystemPromptGenX: 'Custom mock: Support assistant for Gen X.',
+    aiSystemPromptDefault: 'Custom mock: Fallback support assistant.'
+  },
 }
 
-// Maps each of the 19 flat AdminSettingResetKey values (the real Redis key names) back to which
-// nested AdminSystemSettings field it resets and to what default, per the design spec's table
-// (docs/superpowers/specs/2026-08-10-earsforyou-admin-settings-telemetry-design.md). Values are
-// confirmed against AdminSettingController.getSettings()'s raw.getOrDefault(...) fallbacks.
-// Each entry rebuilds a fresh `settings` object (and a fresh nested section object) rather than
-// mutating the existing one in place, so nothing that already holds a reference to a previous
-// `settings` snapshot (e.g. a value returned from an earlier getSettings() call) is affected.
 const SETTING_RESET_DEFAULTS: Record<AdminSettingResetKey, () => void> = {
   api_base_url: () => { settings = { ...settings, apiConfiguration: { ...settings.apiConfiguration, baseUrl: 'https://api.earsfor.you' } } },
   api_version: () => { settings = { ...settings, apiConfiguration: { ...settings.apiConfiguration, apiVersion: 'v1' } } },
@@ -157,7 +155,12 @@ const SETTING_RESET_DEFAULTS: Record<AdminSettingResetKey, () => void> = {
   security_mfa_enabled: () => { settings = { ...settings, securitySettings: { ...settings.securitySettings, mfaEnabled: true } } },
   security_ip_whitelist_enabled: () => { settings = { ...settings, securitySettings: { ...settings.securitySettings, ipWhitelistEnabled: false } } },
   enable_ai_chat: () => { settings = { ...settings, aiConfiguration: { ...settings.aiConfiguration, enableAiChat: true } } },
-  ai_system_prompt: () => { settings = { ...settings, aiConfiguration: { ...settings.aiConfiguration, aiSystemPrompt: DEFAULT_AI_SYSTEM_PROMPT } } },
+  
+  // 🚨 UPDATED: 4 Specific Prompt Reset Actions mapped to their respective defaults
+  ai_system_prompt_genz: () => { settings = { ...settings, aiConfiguration: { ...settings.aiConfiguration, aiSystemPromptGenZ: DEFAULT_AI_PROMPT_GENZ } } },
+  ai_system_prompt_millennial: () => { settings = { ...settings, aiConfiguration: { ...settings.aiConfiguration, aiSystemPromptMillennial: DEFAULT_AI_PROMPT_MILLENNIAL } } },
+  ai_system_prompt_genx: () => { settings = { ...settings, aiConfiguration: { ...settings.aiConfiguration, aiSystemPromptGenX: DEFAULT_AI_PROMPT_GENX } } },
+  ai_system_prompt_default: () => { settings = { ...settings, aiConfiguration: { ...settings.aiConfiguration, aiSystemPromptDefault: DEFAULT_AI_PROMPT_DEFAULT } } },
 }
 
 // Real backend guard (AdminSettingController.updateSettings): only writes email_api_key if the

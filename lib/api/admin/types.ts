@@ -143,7 +143,8 @@ export interface AdminSystemSettings {
   emailConfiguration: { apiKey: string; senderEmail: string; senderName: string }
   otpConfiguration: { otpLength: number; otpExpiryMinutes: number; maxAttempts: number; deliveryChannel: 'EMAIL' | 'SMS' | 'BOTH' }
   securitySettings: { jwtExpiryMinutes: number; refreshTokenExpiryDays: number; maxLoginAttempts: number; sessionTimeoutMinutes: number; mfaEnabled: boolean; ipWhitelistEnabled: boolean }
-  aiConfiguration: { enableAiChat: boolean; aiSystemPrompt: string }
+  aiConfiguration: {enableAiChat: boolean; aiSystemPromptGenZ: string; aiSystemPromptMillennial: string; aiSystemPromptGenX: string; aiSystemPromptDefault: string;
+  }
 }
 // Same shape as AdminSystemSettings, except emailConfiguration.apiKey is optional. The settings
 // page's Save action must be able to send a PATCH that omits apiKey entirely - not an empty string,
@@ -159,7 +160,11 @@ export type AdminSettingResetKey =
   | 'otp_length' | 'otp_expiry_minutes' | 'otp_max_attempts' | 'otp_delivery_channel'
   | 'jwt_expiry_minutes' | 'jwt_refresh_expiry_days' | 'security_max_login_attempts'
   | 'session_timeout_minutes' | 'security_mfa_enabled' | 'security_ip_whitelist_enabled'
-  | 'enable_ai_chat' | 'ai_system_prompt'
+  | 'enable_ai_chat' 
+  | 'ai_system_prompt_genz' 
+  | 'ai_system_prompt_millennial' 
+  | 'ai_system_prompt_genx' 
+  | 'ai_system_prompt_default';
 export interface AdminTelemetryPoint {
   date: string
   totalRequests: number

@@ -13,17 +13,6 @@ import { Toggle } from '@/components/ui/toggle'
 
 const DELIVERY_CHANNELS: AdminSystemSettings['otpConfiguration']['deliveryChannel'][] = ['EMAIL', 'SMS', 'BOTH']
 
-// The form's own local shape: identical to AdminSystemSettings except every numeric leaf field is
-// tracked as its RAW STRING input value, not a coerced number. A number input can be legitimately
-// empty mid-edit (cleared while retyping) - `Number('')` is `0`, a valid-looking number, not `NaN`,
-// so a naive `Number(raw) || 0` coercion stored directly in form state would silently turn a
-// cleared field into a real `0` the instant Save is clicked. Fields like session_timeout_minutes,
-// jwt_expiry_minutes, security_max_login_attempts and otp_length map straight to production Redis
-// keys the backend depends on being positive (a zero-duration Redis TTL is rejected server-side,
-// e.g. for session_timeout_minutes that means every login attempt throws, locking out every admin
-// including the one trying to fix it) - so this form never lets an in-progress edit look like a
-// valid `0`. Numbers are only ever produced at Save time, from validated raw strings - see
-// toSettingsPayload below.
 type SettingsFormState = {
   apiConfiguration: { baseUrl: string; apiVersion: string; rateLimitPerMinute: string; timeoutMs: string }
   emailConfiguration: AdminSystemSettings['emailConfiguration']
@@ -67,10 +56,6 @@ function toFormState(s: AdminSystemSettings): SettingsFormState {
 
 const NUMERIC_FIELD_ERROR = 'Enter a whole number of at least 1.'
 
-// A numeric field's raw string is only ever "valid" if it's non-empty and parses to a finite
-// number >= 1 - every one of this form's numeric fields backs a value the backend either rejects
-// or treats as effectively "off" at 0 (see the SettingsFormState comment above), so there is no
-// safe value to clamp or guess down to; an invalid field just blocks Save until corrected.
 function parseValidNumber(raw: string): number | null {
   if (raw.trim() === '') return null
   const n = Number(raw)
@@ -81,10 +66,6 @@ function numericFieldError(raw: string): string | undefined {
   return parseValidNumber(raw) === null ? NUMERIC_FIELD_ERROR : undefined
 }
 
-// Builds the actual PATCH-ready payload, converting every numeric field's raw string to a number
-// for the first time. Returns null if any numeric field fails validation - the only place that
-// decides "is this form submittable", shared by the Save button's disabled state and the submit
-// handler itself so the two can never disagree.
 function toSettingsPayload(form: SettingsFormState): AdminSystemSettings | null {
   const rateLimitPerMinute = parseValidNumber(form.apiConfiguration.rateLimitPerMinute)
   const timeoutMs = parseValidNumber(form.apiConfiguration.timeoutMs)
@@ -95,6 +76,7 @@ function toSettingsPayload(form: SettingsFormState): AdminSystemSettings | null 
   const refreshTokenExpiryDays = parseValidNumber(form.securitySettings.refreshTokenExpiryDays)
   const maxLoginAttempts = parseValidNumber(form.securitySettings.maxLoginAttempts)
   const sessionTimeoutMinutes = parseValidNumber(form.securitySettings.sessionTimeoutMinutes)
+  
   if (
     rateLimitPerMinute === null || timeoutMs === null || otpLength === null || otpExpiryMinutes === null ||
     maxAttempts === null || jwtExpiryMinutes === null || refreshTokenExpiryDays === null ||
@@ -102,6 +84,7 @@ function toSettingsPayload(form: SettingsFormState): AdminSystemSettings | null 
   ) {
     return null
   }
+  
   return {
     apiConfiguration: { baseUrl: form.apiConfiguration.baseUrl, apiVersion: form.apiConfiguration.apiVersion, rateLimitPerMinute, timeoutMs },
     emailConfiguration: form.emailConfiguration,
@@ -114,14 +97,6 @@ function toSettingsPayload(form: SettingsFormState): AdminSystemSettings | null 
   }
 }
 
-// Applies just the one field a given reset key corresponds to onto the current form, reading the
-// fresh value from a just-refetched AdminSystemSettings. Deliberately per-field, not a whole-object
-// replace: a reset succeeding for one field must never discard an admin's unsaved edits elsewhere
-// on the form. Mirrors the shape of mock-store.ts's SETTING_RESET_DEFAULTS (also keyed by every
-// AdminSettingResetKey), but reads the freshly-fetched value rather than hardcoding a default,
-// since two keys (email_api_key, ai_system_prompt) have no literal default known client-side.
-// Numeric fields are re-stringified going back into the form, matching SettingsFormState's raw
-// string tracking.
 const RESET_KEY_APPLY: Record<AdminSettingResetKey, (form: SettingsFormState, fresh: AdminSystemSettings) => SettingsFormState> = {
   api_base_url: (f, fresh) => ({ ...f, apiConfiguration: { ...f.apiConfiguration, baseUrl: fresh.apiConfiguration.baseUrl } }),
   api_version: (f, fresh) => ({ ...f, apiConfiguration: { ...f.apiConfiguration, apiVersion: fresh.apiConfiguration.apiVersion } }),
@@ -141,13 +116,14 @@ const RESET_KEY_APPLY: Record<AdminSettingResetKey, (form: SettingsFormState, fr
   security_mfa_enabled: (f, fresh) => ({ ...f, securitySettings: { ...f.securitySettings, mfaEnabled: fresh.securitySettings.mfaEnabled } }),
   security_ip_whitelist_enabled: (f, fresh) => ({ ...f, securitySettings: { ...f.securitySettings, ipWhitelistEnabled: fresh.securitySettings.ipWhitelistEnabled } }),
   enable_ai_chat: (f, fresh) => ({ ...f, aiConfiguration: { ...f.aiConfiguration, enableAiChat: fresh.aiConfiguration.enableAiChat } }),
-  ai_system_prompt: (f, fresh) => ({ ...f, aiConfiguration: { ...f.aiConfiguration, aiSystemPrompt: fresh.aiConfiguration.aiSystemPrompt } }),
+  
+  // 🚨 NEW: 4 separate Generational Prompt Reset Keys
+  ai_system_prompt_genz: (f, fresh) => ({ ...f, aiConfiguration: { ...f.aiConfiguration, aiSystemPromptGenZ: fresh.aiConfiguration.aiSystemPromptGenZ } }),
+  ai_system_prompt_millennial: (f, fresh) => ({ ...f, aiConfiguration: { ...f.aiConfiguration, aiSystemPromptMillennial: fresh.aiConfiguration.aiSystemPromptMillennial } }),
+  ai_system_prompt_genx: (f, fresh) => ({ ...f, aiConfiguration: { ...f.aiConfiguration, aiSystemPromptGenX: fresh.aiConfiguration.aiSystemPromptGenX } }),
+  ai_system_prompt_default: (f, fresh) => ({ ...f, aiConfiguration: { ...f.aiConfiguration, aiSystemPromptDefault: fresh.aiConfiguration.aiSystemPromptDefault } }),
 }
 
-// Each row owns its own mutation (matching the already-fixed FailoverOtpButton pattern in
-// components/admin/user-manage-sheet.tsx) so one field's reset failing and showing its error
-// message doesn't get silently cleared the moment a different field's reset is clicked - a single
-// shared mutation instance can only ever describe its own single latest call.
 function ResetAction({ label, settingKey, onReset }: {
   label: string
   settingKey: AdminSettingResetKey
@@ -232,29 +208,11 @@ function SettingsSkeleton() {
 
 function SettingsForm({ settings }: { settings: AdminSystemSettings }) {
   const queryClient = useQueryClient()
-  // Seeded once from the query's data (this component only ever mounts once settings.data
-  // exists - see AdminSettingsPage below), not a controlled form bound live to query data, so
-  // background refetches don't clobber an in-progress edit. Mutations that legitimately change
-  // the stored settings (Save, per-field Reset) explicitly pull the freshly-refetched data back
-  // out and overwrite this state themselves, rather than relying on a prop resync that would also
-  // fire on unrelated refetches.
   const [form, setForm] = useState<SettingsFormState>(() => toFormState(settings))
-  // null: showing the fetched masked value as read-only text with a "Change API key" button.
-  // string (including ''): the admin clicked "Change API key" - this is the fresh value being
-  // typed, tracked separately from `form` so the masked text never becomes directly editable
-  // (the backend silently drops a save whose apiKey contains an 8+ run of '*', so editing the
-  // mask in place risks a silent no-op - see the field's own comment below).
   const [apiKeyDraft, setApiKeyDraft] = useState<string | null>(null)
 
   const isFormValid = toSettingsPayload(form) !== null
 
-  // Fetches a genuinely fresh copy of settings (staleTime: 0 forces a real network/mock round
-  // trip, bypassing the query client's default 30s staleTime so this can't just hand back the
-  // pre-mutation cache entry) and returns null - never a stale value - if that fetch fails.
-  // queryClient.fetchQuery rejects on a failed fetch (unlike invalidateQueries/refetchQueries,
-  // which swallow the rejection by default), which is what lets this function tell a real failure
-  // apart from a successful refetch, instead of a caller reading potentially-stale data straight
-  // out of the cache after an unchecked invalidate.
   async function refetchSettings(): Promise<AdminSystemSettings | null> {
     try {
       return await queryClient.fetchQuery({ queryKey: adminQk.settings, queryFn: getAdminSettings, staleTime: 0 })
@@ -264,13 +222,8 @@ function SettingsForm({ settings }: { settings: AdminSystemSettings }) {
   }
 
   async function handleReset(key: AdminSettingResetKey) {
-    // The audit panel on the Users page should reflect this reset without a manual refresh - mark
-    // it stale now regardless of whether the settings refetch below succeeds.
     void queryClient.invalidateQueries({ queryKey: adminQk.auditLogs })
     const fresh = await refetchSettings()
-    // If the refetch failed, the DELETE itself may still have succeeded server-side - but with no
-    // confirmed fresh value to apply, the only safe move is to leave the admin's current form
-    // exactly as it is rather than silently reverting or guessing.
     if (fresh) {
       setForm(f => RESET_KEY_APPLY[key](f, fresh))
       if (key === 'email_api_key') setApiKeyDraft(null)
@@ -281,14 +234,6 @@ function SettingsForm({ settings }: { settings: AdminSystemSettings }) {
     mutationFn: () => {
       const base = toSettingsPayload(form)
       if (!base) throw new Error('Fix the highlighted fields before saving.')
-      // Only ever send a typed, non-blank apiKey. Whitespace-only input (e.g. an accidental
-      // space) is treated the same as never having typed anything. If "Change API key" was never
-      // clicked, or was clicked but left blank, omit apiKey from the payload entirely rather than
-      // resending form.emailConfiguration.apiKey - that field itself can legitimately be '' (the
-      // backend's maskApiKey returns '' for a short/unset key), and an empty string is NOT caught
-      // by the backend's "contains 8+ stars" skip-write guard, so resending it verbatim would
-      // genuinely wipe the stored key. Omitting the field lets the backend's own `!= null`
-      // skip-write check decide, which is safe for every case.
       const trimmedDraft = apiKeyDraft?.trim() || ''
       if (trimmedDraft) {
         return updateAdminSettings({ ...base, emailConfiguration: { ...base.emailConfiguration, apiKey: trimmedDraft } })
@@ -301,9 +246,6 @@ function SettingsForm({ settings }: { settings: AdminSystemSettings }) {
     onSuccess: async () => {
       void queryClient.invalidateQueries({ queryKey: adminQk.auditLogs })
       const fresh = await refetchSettings()
-      // Same reasoning as handleReset: the PATCH itself succeeded, but if the follow-up GET
-      // failed, there is no confirmed fresh value to reset the form (or the API key draft) to -
-      // leave both exactly as they are rather than reverting to stale pre-save values.
       if (fresh) {
         setForm(toFormState(fresh))
         setApiKeyDraft(null)
@@ -349,10 +291,6 @@ function SettingsForm({ settings }: { settings: AdminSystemSettings }) {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
           <div className="min-w-0 flex-1">
             {apiKeyDraft === null ? (
-              // Read-only by design: the fetched value is always masked (first 4 + a run of '*' +
-              // last 4), and the backend silently drops any submitted value that merely contains
-              // an 8+ run of '*' - editing this text in place risks a silent no-op that looks
-              // successful. "Change API key" below reveals a genuinely empty input instead.
               <>
                 <span className="block text-sm font-medium mb-1.5">API key</span>
                 <div className="flex flex-wrap items-center gap-3">
@@ -458,23 +396,73 @@ function SettingsForm({ settings }: { settings: AdminSystemSettings }) {
           settingKey="security_ip_whitelist_enabled" onReset={handleReset} />
       </Section>
 
+      {/* 🚨 UPDATED: AI Configuration Section now maps the 4 specific prompts */}
       <Section title="AI Configuration">
         <ToggleRow label="Enable AI chat" checked={form.aiConfiguration.enableAiChat}
           onChange={next => set('aiConfiguration', { enableAiChat: next })}
           settingKey="enable_ai_chat" onReset={handleReset} />
+
         <div className="flex flex-col gap-2">
           <label className="block">
-            <span className="block text-sm font-medium mb-1.5">System prompt</span>
+            <span className="block text-sm font-medium mb-1.5">Gen Z System Prompt</span>
             <textarea
-              value={form.aiConfiguration.aiSystemPrompt}
-              onChange={e => set('aiConfiguration', { aiSystemPrompt: e.target.value })}
+              value={form.aiConfiguration.aiSystemPromptGenZ}
+              onChange={e => set('aiConfiguration', { aiSystemPromptGenZ: e.target.value })}
               rows={4}
               className="w-full rounded-xl border-[1.5px] border-fir/30 bg-card px-4 py-3 text-[15px]
                 outline-none focus:border-leaf focus:ring-2 focus:ring-leaf/25"
             />
           </label>
           <div className="flex justify-end">
-            <ResetAction label="System prompt" settingKey="ai_system_prompt" onReset={handleReset} />
+            <ResetAction label="Gen Z System Prompt" settingKey="ai_system_prompt_genz" onReset={handleReset} />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="block">
+            <span className="block text-sm font-medium mb-1.5">Millennial System Prompt</span>
+            <textarea
+              value={form.aiConfiguration.aiSystemPromptMillennial}
+              onChange={e => set('aiConfiguration', { aiSystemPromptMillennial: e.target.value })}
+              rows={4}
+              className="w-full rounded-xl border-[1.5px] border-fir/30 bg-card px-4 py-3 text-[15px]
+                outline-none focus:border-leaf focus:ring-2 focus:ring-leaf/25"
+            />
+          </label>
+          <div className="flex justify-end">
+            <ResetAction label="Millennial System Prompt" settingKey="ai_system_prompt_millennial" onReset={handleReset} />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="block">
+            <span className="block text-sm font-medium mb-1.5">Gen X System Prompt</span>
+            <textarea
+              value={form.aiConfiguration.aiSystemPromptGenX}
+              onChange={e => set('aiConfiguration', { aiSystemPromptGenX: e.target.value })}
+              rows={4}
+              className="w-full rounded-xl border-[1.5px] border-fir/30 bg-card px-4 py-3 text-[15px]
+                outline-none focus:border-leaf focus:ring-2 focus:ring-leaf/25"
+            />
+          </label>
+          <div className="flex justify-end">
+            <ResetAction label="Gen X System Prompt" settingKey="ai_system_prompt_genx" onReset={handleReset} />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label className="block">
+            <span className="block text-sm font-medium mb-1.5">Default System Prompt (Fallback)</span>
+            <textarea
+              value={form.aiConfiguration.aiSystemPromptDefault}
+              onChange={e => set('aiConfiguration', { aiSystemPromptDefault: e.target.value })}
+              rows={4}
+              className="w-full rounded-xl border-[1.5px] border-fir/30 bg-card px-4 py-3 text-[15px]
+                outline-none focus:border-leaf focus:ring-2 focus:ring-leaf/25"
+            />
+          </label>
+          <div className="flex justify-end">
+            <ResetAction label="Default System Prompt" settingKey="ai_system_prompt_default" onReset={handleReset} />
           </div>
         </div>
       </Section>
@@ -490,12 +478,6 @@ export default function AdminSettingsPage() {
   const settings = useQuery({ queryKey: adminQk.settings, queryFn: getAdminSettings })
 
   let content: ReactNode
-  // Gated on isError && !data (not isError alone): a background refetch that react-query triggers
-  // after a successful mutation (e.g. this page's own invalidateQueries calls) can itself fail
-  // without the earlier successful fetch's data ever being cleared. Unmounting SettingsForm in
-  // that case would discard any unsaved edits still sitting in its local form state, even though
-  // the write that triggered the refetch already succeeded - so only show the full-page error
-  // state when there has never been a successful fetch to fall back on.
   if (settings.isError && !settings.data) {
     content = <ErrorState error={settings.error} retry={() => void settings.refetch()} />
   } else if (settings.isLoading || !settings.data) {
