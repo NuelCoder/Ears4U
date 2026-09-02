@@ -3,7 +3,7 @@ import { ApiError, friendlyFor, COLD_START_MESSAGE, NETWORK_ERROR_MESSAGE } from
 import { MOCKS_ENABLED } from '../mocks'
 import { mockFetch } from './mock-fetch'
 
-const BASE = '/backend'
+const BASE = process.env.NEXT_PUBLIC_API_URL || ''
 const DEFAULT_COLD_START_MS = 8000
 
 let authExpiredCb: (() => void) | null = null

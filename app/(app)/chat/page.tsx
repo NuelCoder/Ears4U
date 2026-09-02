@@ -180,11 +180,14 @@ export default function ChatPage() {
     send.mutate({ id, text })
   }
 
-  const messages = (history.data ?? [])
-    .filter(m => normalizeRole(m.role) !== null)
+ const messages = (history.data ?? [])
+    .filter(m => 
+      normalizeRole(m.role) !== null && 
+      typeof m.content === 'string' && 
+      m.content.trim().length > 0
+    )
     .slice()
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-
   const isEmpty = messages.length === 0 && pending.length === 0
 
   useEffect(() => {
