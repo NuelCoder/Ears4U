@@ -55,11 +55,7 @@ export const getJournal = (id: number) => apiFetch<JournalEntry>(`/api/v1/journa
 export const createJournal = (p: JournalPayload) => apiFetch<JournalEntry>('/api/v1/journal/entry', { method: 'POST', body: p })
 export const updateJournal = (id: number, p: JournalPayload) => apiFetch<JournalEntry>(`/api/v1/journal/update-journal/${id}`, { method: 'PUT', body: p })
 export const deleteJournal = (id: number) => apiFetch(`/api/v1/journal/delete-journal/${id}`, { method: 'DELETE' })
-export const sendChat = (message: string) => 
-  apiFetch<{ reply?: string; response?: string; message?: string }>(
-    `${process.env.NEXT_PUBLIC_API_URL}/api/v1/users/chat`, 
-    { method: 'POST', body: { message } }
-  )
+export const sendChat = (message: string) => apiFetch<{ reply?: string; response?: string; message?: string }>('/api/v1/users/chat', { method: 'POST', body: { message } })
 export const getChatHistory = () => apiFetch<ChatMessage[]>('/api/v1/users/chat/history')
 export const getNotifications = () => apiFetch<NotificationItem[]>('/api/v1/users/notifications')
 export const getUnreadCount = () => apiFetch<{ count?: number; unreadCount?: number }>('/api/v1/users/notifications/unread-count')
