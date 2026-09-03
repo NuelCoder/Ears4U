@@ -3,7 +3,17 @@ import { ApiError, friendlyFor, COLD_START_MESSAGE, NETWORK_ERROR_MESSAGE } from
 import { MOCKS_ENABLED } from '../../mocks'
 import { adminMockFetch } from './mock-fetch'
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || ''
+function getBaseUrl(path: string): string {
+  // 1. Auth requests (login, refresh, logout) MUST use the Vercel proxy 
+  // so iOS accepts the cookies on the same domain.
+  if (path.startsWith('/api/v1/auth/')) {
+    return '/backend'
+  }
+  // 2. All other data requests (and long AI tasks) go directly to Render 
+  // to bypass Vercel's 10-second timeout.
+  return process.env.NEXT_PUBLIC_API_URL || ''
+}
+
 const DEFAULT_COLD_START_MS = 8000
 
 let authExpiredCb: (() => void) | null = null
@@ -32,7 +42,7 @@ export async function refreshAdminSession(): Promise<boolean> {
   inFlightRefresh = (async () => {
     let res: Response
     try {
-      res = await fetch(`${BASE}/api/v1/auth/admin-refresh`, { method: 'POST', credentials: 'include' })
+     res = await fetch(`/backend/api/v1/auth/admin-refresh`, { method: 'POST', credentials: 'include' })
     } catch {
       throw new ApiError(0, NETWORK_ERROR_MESSAGE)
     }
@@ -63,7 +73,7 @@ export async function adminApiFetch<T = unknown>(path: string, opts: Opts = {}):
     const token = getAdminAccessToken()
     if (auth && token) headers.set('authorization', `Bearer ${token}`)
     try {
-      return await fetch(`${BASE}${path}`, {
+      return await fetch(`${getBaseUrl(path)}${path}`, {
         method,
         headers,
         credentials: 'include',
@@ -114,7 +124,7 @@ export async function adminApiFetchBlob(path: string, coldStartMs: number = DEFA
     const token = getAdminAccessToken()
     if (token) headers.set('authorization', `Bearer ${token}`)
     try {
-      return await fetch(`${BASE}${path}`, { method: 'GET', headers, credentials: 'include' })
+      return await fetch(`${getBaseUrl(path)}${path}`,{ method: 'GET', headers, credentials: 'include' })
     } catch {
       throw new ApiError(0, NETWORK_ERROR_MESSAGE)
     }

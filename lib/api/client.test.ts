@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { apiFetch, onAuthExpired } from './client'
 import { setAccessToken, getAccessToken, clearAccessToken } from './token'
 import { ApiError, NETWORK_ERROR_MESSAGE } from './errors'
@@ -10,10 +10,43 @@ function jsonRes(status: number, body?: unknown) {
   })
 }
 
-describe('apiFetch', () => {
+describe('Hybrid Routing Strategy', () => {
   beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://earsforyou.onrender.com')
     clearAccessToken()
     vi.restoreAllMocks()
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('routes auth requests through the Vercel proxy', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonRes(200, { ok: true }))
+    
+    await apiFetch('/api/v1/auth/user-login', { auth: false })
+    
+    const [url] = spy.mock.calls[0]!
+    expect(url).toBe('/backend/api/v1/auth/user-login')
+  })
+
+  it('routes data/chat requests directly to the Render backend', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonRes(200, { ok: true }))
+    
+    await apiFetch('/api/v1/users/chat', { auth: false })
+    
+    const [url] = spy.mock.calls[0]!
+    expect(url).toBe('https://earsforyou.onrender.com/api/v1/users/chat')
+  })
+})
+
+describe('apiFetch', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://earsforyou.onrender.com')
+    clearAccessToken()
+    vi.restoreAllMocks()
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   it('attaches bearer token and parses json', async () => {
@@ -22,7 +55,8 @@ describe('apiFetch', () => {
     const out = await apiFetch<{ greeting: string }>('/api/v1/dashboard/home')
     expect(out.greeting).toBe('hi')
     const [url, init] = spy.mock.calls[0]!
-    expect(url).toBe('/backend/api/v1/dashboard/home')
+    // This is a data route, so it should go to Render now!
+    expect(url).toBe('https://earsforyou.onrender.com/api/v1/dashboard/home')
     expect(new Headers(init!.headers).get('authorization')).toBe('Bearer tok')
   })
 

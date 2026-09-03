@@ -5,6 +5,37 @@ import { ApiError, COLD_START_MESSAGE } from '../errors'
 
 const originalFetch = global.fetch
 
+describe('Hybrid Routing Strategy', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://earsforyou.onrender.com')
+    clearAdminAccessToken()
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    global.fetch = originalFetch
+  })
+
+  it('routes auth requests through the Vercel proxy', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true })))
+    global.fetch = fetchMock as unknown as typeof fetch
+
+    await adminApiFetch('/api/v1/auth/admin-login', { auth: false })
+    
+    const [url] = fetchMock.mock.calls[0]!
+    expect(url).toBe('/backend/api/v1/auth/admin-login')
+  })
+
+  it('routes data requests directly to the Render backend', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true })))
+    global.fetch = fetchMock as unknown as typeof fetch
+
+    await adminApiFetch('/api/v1/admins/me', { auth: false })
+    
+    const [url] = fetchMock.mock.calls[0]!
+    expect(url).toBe('https://earsforyou.onrender.com/api/v1/admins/me')
+  })
+})
+
 describe('adminApiFetch', () => {
   beforeEach(() => {
     clearAdminAccessToken()

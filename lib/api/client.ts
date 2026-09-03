@@ -3,7 +3,15 @@ import { ApiError, friendlyFor, COLD_START_MESSAGE, NETWORK_ERROR_MESSAGE } from
 import { MOCKS_ENABLED } from '../mocks'
 import { mockFetch } from './mock-fetch'
 
-const BASE = process.env.NEXT_PUBLIC_API_URL || ''
+function getBaseUrl(path: string): string {
+  // Route Auth and standard requests through Vercel proxy for iOS compatibility
+  if (path.startsWith('/api/v1/auth/')) {
+    return '/backend'
+  }
+  // Route long-running data requests directly to Render to bypass timeouts
+  return process.env.NEXT_PUBLIC_API_URL || ''
+}
+
 const DEFAULT_COLD_START_MS = 8000
 
 let authExpiredCb: (() => void) | null = null
@@ -27,7 +35,11 @@ async function parseBody(res: Response): Promise<unknown> {
 async function refresh(): Promise<boolean> {
   let res: Response
   try {
-    res = await fetch(`${BASE}/api/v1/auth/user-refresh`, { method: 'POST' })
+    // Auth endpoints must use the proxy and include credentials
+    res = await fetch(`/backend/api/v1/auth/user-refresh`, { 
+      method: 'POST',
+      credentials: 'include' 
+    })
   } catch {
     // A network failure is not an auth failure. Let it propagate as an
     // ApiError so the caller does not clear the token or redirect to sign-in.
@@ -53,9 +65,10 @@ export async function apiFetch<T = unknown>(path: string, opts: Opts = {}): Prom
     const token = getAccessToken()
     if (auth && token) headers.set('authorization', `Bearer ${token}`)
     try {
-      return await fetch(`${BASE}${path}`, {
+      return await fetch(`${getBaseUrl(path)}${path}`, {
         method,
         headers,
+        credentials: 'include',
         body: body === undefined ? undefined : JSON.stringify(body),
       })
     } catch {
