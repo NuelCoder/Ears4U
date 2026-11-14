@@ -19,6 +19,9 @@ async function forward(req: Request, ctx: Ctx) {
 
   // 2. Clone ALL outgoing headers exactly as Render sent them to avoid Next.js comma-merging
   const resHeaders = new Headers(upstream.headers)
+
+  resHeaders.delete("content-encoding")
+  resHeaders.delete("content-length")
   
   return new Response(upstream.body, { 
     status: upstream.status, 
